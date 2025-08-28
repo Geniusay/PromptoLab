@@ -2,6 +2,7 @@ package io.github.timemachinelab.core.session.application;
 
 import io.github.timemachinelab.core.session.domain.entity.ConversationSession;
 import io.github.timemachinelab.core.session.infrastructure.web.dto.UnifiedAnswerRequest;
+import io.github.timemachinelab.entity.User;
 
 /**
  * 消息处理服务接口
@@ -58,5 +59,5 @@ public interface MessageProcessingService {
       * @param session 会话对象
       * @param processedMessage 处理后的消息
       */
-     void processAndSendMessage(ConversationSession session, String processedMessage);
+     void processAndSendMessage(User user, ConversationSession session, String processedMessage);
 }

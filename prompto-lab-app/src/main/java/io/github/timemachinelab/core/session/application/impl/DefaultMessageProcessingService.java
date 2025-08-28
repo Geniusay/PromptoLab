@@ -2,7 +2,7 @@ package io.github.timemachinelab.core.session.application.impl;
 
 
 import com.alibaba.fastjson2.JSONObject;
-import com.fasterxml.jackson.core.JsonProcessingException;;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.github.timemachinelab.core.constant.AllPrompt;
 import io.github.timemachinelab.core.qatree.QaTree;
 import io.github.timemachinelab.core.qatree.QaTreeDomain;
@@ -12,6 +12,7 @@ import io.github.timemachinelab.core.session.application.ConversationService;
 import io.github.timemachinelab.core.session.application.SseNotificationService;
 import io.github.timemachinelab.core.session.domain.entity.ConversationSession;
 import io.github.timemachinelab.core.session.infrastructure.web.dto.UnifiedAnswerRequest;
+import io.github.timemachinelab.entity.User;
 import io.github.timemachinelab.util.QaTreeSerializeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -188,14 +189,26 @@ public class DefaultMessageProcessingService implements MessageProcessingService
      }
      
      @Override
-     public void processAndSendMessage(ConversationSession session, String processedMessage) {
+     public void processAndSendMessage(User user, ConversationSession session, String processedMessage) {
          try {
              log.info("发送消息给AI服务 - 会话: {}, 用户: {}", session.getSessionId(), session.getUserId());
              
              conversationService.processUserMessage(
                      session.getUserId(),
                      processedMessage,
-                     response -> sseNotificationService.sendSseMessage(session.getSessionId(), response)
+                     response -> {
+                         // 1. 先将AI生成的新问题添加到QaTree（只填入question，answer留空）
+                         // 使用QaTreeDomain添加新节点，answer字段会自动为空
+                         // appendNode方法内部会调用session.getNextNodeId()获取新节点ID
+                         QaTree qaTree = qaTreeDomain.appendNode(
+                                 session.getQaTree(),
+                                 response.getParentId(),
+                                 response.getQuestion(),
+                                 session
+                         );
+
+                         sseNotificationService.sendSseQuestionMessage(user, session, response);
+                     }
              );
              
              log.info("消息发送成功 - 会话: {}", session.getSessionId());

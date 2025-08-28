@@ -1,6 +1,5 @@
 package io.github.timemachinelab.core.session.infrastructure.web.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.NoArgsConstructor;
@@ -25,7 +24,6 @@ public class UnifiedAnswerRequest {
     /**
      * 会话ID
      */
-    @NotBlank(message = "会话ID不能为空")
     private String sessionId;
     
     /**
