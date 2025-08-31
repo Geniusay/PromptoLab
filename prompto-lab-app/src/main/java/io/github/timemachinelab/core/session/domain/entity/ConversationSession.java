@@ -30,6 +30,8 @@ public class ConversationSession {
     private String aiModel; // AI模型
 
     private String genPrompt; // 生成提示词
+
+
     
     // 节点ID自增计数器，从1开始
     private final AtomicInteger nodeIdCounter = new AtomicInteger(0);
@@ -56,5 +58,9 @@ public class ConversationSession {
      */
     public AtomicInteger getNodeIdCounter() {
         return nodeIdCounter;
+    }
+
+    public boolean hasNodeId(String nodeId){
+        return qaTree.getNodeById(nodeId) != null;
     }
 }

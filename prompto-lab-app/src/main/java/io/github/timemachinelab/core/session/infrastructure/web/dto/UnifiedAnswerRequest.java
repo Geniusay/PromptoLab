@@ -30,6 +30,11 @@ public class UnifiedAnswerRequest {
      * 节点ID
      */
     private String nodeId;
+
+    /**
+     * 用户画像
+     */
+    private String user;
     
     /**
      * 问题类型：single, multi, input, form

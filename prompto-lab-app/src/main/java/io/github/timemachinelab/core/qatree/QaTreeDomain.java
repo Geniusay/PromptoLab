@@ -45,16 +45,15 @@ public class QaTreeDomain {
     
     /**
      * 使用ConversationSession的自增ID向QaTree添加节点
-     * @param tree QA树
      * @param parentId 父节点ID
      * @param qa 问题对象
      * @param session 会话对象，用于获取自增ID
      * @return 更新后的QaTree
      */
-    public QaTree appendNode(QaTree tree, String parentId, BaseQuestion qa, ConversationSession session) {
+    public QaTree appendNode(String parentId, BaseQuestion qa, ConversationSession session) {
         String nodeId = session.getNextNodeId();
-        tree.addNode(parentId, new QaTreeNode(qa, nodeId));
-        return tree;
+        session.getQaTree().addNode(parentId, new QaTreeNode(qa, nodeId));
+        return session.getQaTree();
     }
 
     /**

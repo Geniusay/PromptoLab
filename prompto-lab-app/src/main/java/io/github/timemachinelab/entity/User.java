@@ -4,6 +4,7 @@ package io.github.timemachinelab.entity;
 import io.github.timemachinelab.core.session.domain.entity.ConversationSession;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -39,6 +40,9 @@ public class User {
      * 会话映射表，sessionId -> ConversationSession
      */
     private final Map<String, ConversationSession> sessionMap = new ConcurrentHashMap<>();
+
+    @Getter
+    private ConversationSession latestSession;
     
     /**
      * 构造函数，初始化sessionMap
@@ -53,6 +57,7 @@ public class User {
      */
     public void addSession(String sessionId, ConversationSession session) {
         sessionMap.put(sessionId, session);
+        latestSession = session;
     }
     
     /**

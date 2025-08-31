@@ -27,13 +27,7 @@ public class ConversationService {
     private SessionManagementService sessionManagementService;
 
     
-    public void processUserMessage(String userId, String userMessage, Consumer<QuestionGenerationOperation.QuestionGenerationResponse> sseCallback) {
-        ConversationSession session = sessionManagementService.getUserLatestSession(userId);
-        if (session == null) {
-            log.warn("会话不存在");
-            return;
-        }
-
+    public void processUserMessage(String userMessage, Consumer<QuestionGenerationOperation.QuestionGenerationResponse> sseCallback) {
         processAIResponse(userMessage, sseCallback);
     }
 

@@ -20,7 +20,7 @@ public interface MessageProcessingService {
      * @param request 统一答案请求
      * @return 处理后的消息内容
      */
-    String processAnswer(UnifiedAnswerRequest request);
+    String processAnswer(ConversationSession session, UnifiedAnswerRequest request);
     
     /**
      * 预处理消息
@@ -44,13 +44,12 @@ public interface MessageProcessingService {
       * 处理重试请求
       * 将重试信息转换为适合大模型处理的格式
       * 
-      * @param sessionId 会话ID
+      * @param session 会话
       * @param nodeId 节点ID
       * @param whyRetry 重试原因
-      * @param conversationSession 会话对象
       * @return 处理后的消息内容
       */
-     String processRetryMessage(String sessionId, String nodeId, String whyRetry, ConversationSession conversationSession);
+     String processRetryMessage(ConversationSession session, String nodeId, String whyRetry);
      
      /**
       * 处理并发送消息给AI服务

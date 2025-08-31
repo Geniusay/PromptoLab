@@ -10,10 +10,14 @@ public class QaTree {
     @Getter
     private QaTreeNode root;
 
+    @Getter
+    private QaTreeNode latestNode;
+
     private Map<String, QaTreeNode> nodeMap = new HashMap<>();
 
     public QaTree(QaTreeNode root) {
         this.root = root;
+        this.latestNode = root;
         nodeMap.put(root.getId(), root);
     }
 
@@ -24,6 +28,7 @@ public class QaTree {
         }
         parent.append(node);
         nodeMap.put(node.getId(), node);
+        latestNode = node;
     }
 
     public QaTreeNode getNodeById(String id) {

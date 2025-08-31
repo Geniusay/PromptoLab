@@ -3,6 +3,8 @@ package io.github.timemachinelab.core.session.application;
 import io.github.timemachinelab.core.qatree.QaTree;
 import io.github.timemachinelab.core.qatree.QaTreeDomain;
 import io.github.timemachinelab.core.session.domain.entity.ConversationSession;
+import io.github.timemachinelab.entity.User;
+import io.github.timemachinelab.manager.UserManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -28,90 +30,21 @@ public class SessionManagementService {
     
     // 用户ID到会话ID列表的映射（一对多关系）
     private final Map<String, List<String>> userSessionMap = new ConcurrentHashMap<>();
-    
+
     // 会话存储
     private final Map<String, ConversationSession> sessions = new ConcurrentHashMap<>();
 
     @Resource
     private QaTreeDomain qaTreeDomain;
-    /**
-     * 创建或获取用户会话
-     * 如果sessionId为null，创建新会话；否则验证并返回现有会话
-     * 
-     * @param userId 用户ID
-     * @param sessionId 会话ID（可为null）
-     * @return 会话对象
-     */
-    public ConversationSession getOrCreateSession(String userId, String sessionId) {
-        if (sessionId == null || sessionId.trim().isEmpty()) {
-            // 创建新会话
-            return createNewSession(userId);
-        } else {
-            // 验证现有会话
-            return validateAndGetSession(userId, sessionId);
-        }
-    }
-    
-    /**
-     * 验证nodeId是否属于指定会话
-     * 
-     * @param sessionId 会话ID
-     * @param nodeId 节点ID
-     * @return 是否有效
-     */
-    public boolean validateNodeId(String sessionId, String nodeId) {
-        ConversationSession session = sessions.get(sessionId);
-        if (session == null) {
-            log.warn("会话不存在: {}", sessionId);
-            return false;
-        }
-        
-        // 检查节点是否存在于qaTree中
-        boolean exists = session.getQaTree().getNodeById(nodeId) != null;
-        if (!exists) {
-            log.warn("节点不存在 - 会话: {}, 节点: {}", sessionId, nodeId);
-        }
-        
-        return exists;
-    }
-    
-    /**
-     * 获取用户的所有会话
-     * 
-     * @param userId 用户ID
-     * @return 会话列表
-     */
-    public List<ConversationSession> getUserSessions(String userId) {
-        List<String> sessionIds = userSessionMap.get(userId);
-        if (sessionIds == null || sessionIds.isEmpty()) {
-            return new ArrayList<>();
-        }
-        return sessionIds.stream()
-                .map(sessions::get)
-                .filter(session -> session != null)
-                .collect(Collectors.toList());
-    }
-    
-    /**
-     * 获取用户最新的会话（最后创建的会话）
-     * 
-     * @param userId 用户ID
-     * @return 最新的会话对象，如果没有会话则返回null
-     */
-    public ConversationSession getUserLatestSession(String userId) {
-        List<String> sessionIds = userSessionMap.get(userId);
-        if (sessionIds == null || sessionIds.isEmpty()) {
-            return null;
-        }
-        // 返回列表中最后一个会话（最新创建的）
-        String latestSessionId = sessionIds.get(sessionIds.size() - 1);
-        return sessions.get(latestSessionId);
-    }
+
+    @Resource
+    private UserManager userManager;
 
     /**
      * 创建新会话
      */
     public ConversationSession createNewSession(String userId) {
+        User user = userManager.getUser(userId);
         // 生成新的sessionId
         String newSessionId = UUID.randomUUID().toString();
         
@@ -124,11 +57,9 @@ public class SessionManagementService {
         // 设置QaTree到会话中
         session.setQaTree(tree);
 
-        // 建立映射关系 - 添加到用户的会话列表中
-        userSessionMap.computeIfAbsent(userId, k -> new ArrayList<>()).add(session.getSessionId());
-        sessions.put(session.getSessionId(), session);
-
         log.info("创建新会话 - 用户: {}, 会话: {}, 根节点ID: 1", userId, session.getSessionId());
+
+        user.addSession(newSessionId, session);
         return session;
     }
     
@@ -166,20 +97,9 @@ public class SessionManagementService {
      * 
      * @param sessionId 会话ID
      */
-    public void removeSession(String sessionId) {
-        ConversationSession session = sessions.remove(sessionId);
-        if (session != null) {
-            // 从用户会话列表中移除该会话ID
-            List<String> userSessions = userSessionMap.get(session.getUserId());
-            if (userSessions != null) {
-                userSessions.remove(sessionId);
-                // 如果用户没有其他会话了，移除整个映射
-                if (userSessions.isEmpty()) {
-                    userSessionMap.remove(session.getUserId());
-                }
-            }
-            log.info("清理会话 - 用户: {}, 会话: {}", session.getUserId(), sessionId);
-        }
+    public void removeSession(User user, String sessionId) {
+        user.removeSession(sessionId);
+        log.info("清理会话 - 用户: {}, 会话: {}", user.getUserId(), sessionId);
     }
     
     /**
@@ -206,71 +126,32 @@ public class SessionManagementService {
     public ConversationSession getSessionById(String sessionId) {
         return sessions.get(sessionId);
     }
-    
-    /**
-     * 检查用户是否拥有指定的会话
-     * 
-     * @param userId 用户ID
-     * @param sessionId 会话ID
-     * @return 是否拥有该会话
-     */
-    public boolean userOwnsSession(String userId, String sessionId) {
-        List<String> userSessions = userSessionMap.get(userId);
-        return userSessions != null && userSessions.contains(sessionId);
-    }
+
     
     /**
      * 获取指定会话中节点的问题内容
-     * 
-     * @param sessionId 会话ID
+     *
      * @param nodeId 节点ID
      * @return 问题内容，如果节点不存在或问题为空则返回null
      */
-    public String getNodeQuestion(String sessionId, String nodeId) {
-        ConversationSession session = sessions.get(sessionId);
-        if (session == null) {
-            log.warn("会话不存在: {}", sessionId);
-            return null;
-        }
-        
+    public String getNodeQuestion(ConversationSession session, String nodeId) {
         QaTree tree = session.getQaTree();
         return qaTreeDomain.getNodeQuestion(tree, nodeId);
     }
     
-    /**
-     * 验证指定会话中的节点是否存在
-     * 
-     * @param sessionId 会话ID
-     * @param nodeId 节点ID
-     * @return 节点是否存在
-     */
-    public boolean validateNodeExists(String sessionId, String nodeId) {
-        ConversationSession session = sessions.get(sessionId);
-        if (session == null) {
-            log.warn("会话不存在: {}", sessionId);
-            return false;
-        }
-        
-        QaTree tree = session.getQaTree();
-        return qaTreeDomain.nodeExists(tree, nodeId);
-    }
-    
+
     /**
      * 移除指定会话中的节点
      * 
-     * @param sessionId 会话ID
+     * @param session 会话ID
      * @param nodeId 节点ID
      * @return 是否移除成功
      */
-    public boolean removeNode(String sessionId, String nodeId) {
-        ConversationSession session = sessions.get(sessionId);
-        if (session == null) {
-            log.warn("会话不存在: {}", sessionId);
-            return false;
-        }
-        
+    public boolean removeNode(ConversationSession session, String nodeId) {
+        String sessionId = session.getSessionId();
         QaTree tree = session.getQaTree();
         if (tree == null) {
+
             log.warn("会话的QaTree不存在: {}", sessionId);
             return false;
         }

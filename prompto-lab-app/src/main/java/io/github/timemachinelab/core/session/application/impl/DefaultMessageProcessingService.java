@@ -40,17 +40,10 @@ public class DefaultMessageProcessingService implements MessageProcessingService
     SseNotificationService sseNotificationService;
 
     @Override
-    public String processAnswer(UnifiedAnswerRequest request) {
-        if (!validateAnswer(request)) {
-            log.warn("无效的答案请求: {}", request);
-            return "无效的回答格式";
-        }
+    public String processAnswer(ConversationSession session, UnifiedAnswerRequest request) {
         
         // 获取会话并更新qaTree
-        ConversationSession session = sessionManagementService.validateAndGetSession(request.getUserId(), request.getSessionId());
-        if (session != null) {
-            updateQaTreeWithAnswer(session, request);
-        }
+        updateQaTreeWithAnswer(session, request);
         
         // 将答案转换为可读文本
         String readableText = request.toReadableText();
@@ -160,7 +153,9 @@ public class DefaultMessageProcessingService implements MessageProcessingService
     }
     
     @Override
-    public String processRetryMessage(String sessionId, String nodeId, String whyRetry, ConversationSession conversationSession) {
+    public String processRetryMessage(ConversationSession session, String nodeId, String whyRetry) {
+
+        String sessionId = session.getSessionId();
         try {
             // 构建重试消息的JSON格式
             JSONObject retryInput = new JSONObject();
@@ -169,14 +164,14 @@ public class DefaultMessageProcessingService implements MessageProcessingService
             retryInput.put("whyRetry", whyRetry != null ? whyRetry : "用户要求重新生成问题");
             
             // 获取节点的问题内容
-            String preQuestion = sessionManagementService.getNodeQuestion(sessionId, nodeId);
+            String preQuestion = sessionManagementService.getNodeQuestion(session, nodeId);
             if (preQuestion != null) {
                 retryInput.put("preQuestion", preQuestion);
             }
             
             JSONObject object = new JSONObject();
             object.put("prompt", AllPrompt.GLOBAL_PROMPT);
-            object.put("tree", QaTreeSerializeUtil.serialize(conversationSession.getQaTree()));
+            object.put("tree", QaTreeSerializeUtil.serialize(session.getQaTree()));
             object.put("input", retryInput.toString());
             
             log.info("处理重试消息 - 会话: {}, 节点: {}, 原因: {}", sessionId, nodeId, whyRetry);
@@ -194,19 +189,16 @@ public class DefaultMessageProcessingService implements MessageProcessingService
              log.info("发送消息给AI服务 - 会话: {}, 用户: {}", session.getSessionId(), session.getUserId());
              
              conversationService.processUserMessage(
-                     session.getUserId(),
                      processedMessage,
                      response -> {
                          // 1. 先将AI生成的新问题添加到QaTree（只填入question，answer留空）
                          // 使用QaTreeDomain添加新节点，answer字段会自动为空
                          // appendNode方法内部会调用session.getNextNodeId()获取新节点ID
                          QaTree qaTree = qaTreeDomain.appendNode(
-                                 session.getQaTree(),
                                  response.getParentId(),
                                  response.getQuestion(),
                                  session
                          );
-
                          sseNotificationService.sendSseQuestionMessage(user, session, response);
                      }
              );
